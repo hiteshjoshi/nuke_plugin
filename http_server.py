@@ -16,9 +16,10 @@ import mimetypes
 import re
 from io import BytesIO
 import json
+import sys
 from fastai.vision import *
 
-learn = load_learner('')
+learn = load_learner(sys.argv[1])
 
 
 class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
@@ -47,19 +48,19 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     def deal_post_data(self):
         content_type = self.headers['content-type']
         if not content_type:
-            return (False, str(0), 0)
+            return (False, 0, 0)
         boundary = content_type.split("=")[1].encode()
         remainbytes = int(self.headers['content-length'])
         line = self.rfile.readline()
         remainbytes -= len(line)
         if not boundary in line:
-            return (False, str(0), remainbytes)
+            return (False, 0, remainbytes)
         line = self.rfile.readline()
         remainbytes -= len(line)
         fn = re.findall(
             r'Content-Disposition.*name="file"; filename="(.*)"', line.decode())
         if not fn:
-            return (False, str(0), remainbytes)
+            return (False, 0, remainbytes)
         path = self.translate_path(self.path)
         fn = os.path.join(path, fn[0])
         line = self.rfile.readline()
@@ -69,7 +70,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         try:
             out = open(fn, 'wb')
         except IOError:
-            return (False, str(0), remainbytes)
+            return (False, 0, remainbytes)
 
         preline = self.rfile.readline()
         remainbytes -= len(preline)
@@ -83,11 +84,11 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
                 out.write(preline)
                 out.close()
                 pred_class, pred_idx, outputs = learn.predict(open_image(fn))
-                return (True, str(pred_class), remainbytes)
+                return (True, pred_class, remainbytes)
             else:
                 out.write(preline)
                 preline = line
-        return (False, str(0), remainbytes)
+        return (False, 0, remainbytes)
 
     def translate_path(self, path):
         """Translate a /-separated PATH to the local filename syntax.
